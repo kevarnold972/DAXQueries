@@ -1,0 +1,70 @@
+/***********************************************************
+Credit Vahid Doustimajd
+From https://www.linkedin.com/pulse/using-info-dax-functions-clear-table-relationship-power-doustimajd-ytfdc/?utm_source=share&utm_medium=member_ios&utm_campaign=share_via
+************************************************************/
+
+DEFINE
+	VAR _Table = SELECTCOLUMNS(
+		INFO.TABLES(),
+		"TableID",	[ID],
+		"TableName", [Name]
+	)
+	VAR _Col = SELECTCOLUMNS(
+		INFO.COLUMNS(),
+		"ColumnID",	[ID],
+		"ColumnName",
+		IF(
+			ISBLANK([ExplicitName]),
+			[InferredName],
+			[ExplicitName]
+		)
+	)
+	VAR _RelFrom = SELECTCOLUMNS(
+		INFO.RELATIONSHIPS(),
+		 [ID],
+		[FromCardinality],
+		[State],
+		[CrossFilteringBehavior],
+		"ColumnID", [FromColumnID],
+		"TableID", [FromTableID]
+	)
+	VAR _RelTo = SELECTCOLUMNS(
+		INFO.RELATIONSHIPS(),
+		[ID],
+		[ToCardinality], "ColumnID",
+		[ToColumnID], "TableID",
+		[ToTableID]
+	)
+	VAR _FromRel = 
+		SELECTCOLUMNS (
+			NATURALLEFTOUTERJOIN ( NATURALLEFTOUTERJOIN ( _RelFrom, _Table ), _Col ),
+			[ID],
+			[State],
+			"FromTable", [TableName],
+			"FromColumn", [ColumnName],
+			"CrossFilter", SWITCH ( [CrossFilteringBehavior], 1, "One", 2, "both" ),
+			"FromCardinality", SWITCH ( [FromCardinality], 1, "One", 2, "Many" )
+		)
+
+	VAR _ToRel = 
+		SELECTCOLUMNS (
+			NATURALLEFTOUTERJOIN ( NATURALLEFTOUTERJOIN ( _RelTo, _Table ), _Col ),
+			[ID],
+			"ToTable", [TableName],
+			"ToColumn", [ColumnName],
+			"ToCardinality", SWITCH ( [ToCardinality], 1, "One", 2, "Many" )
+		)
+	
+	VAR _result = 
+		SELECTCOLUMNS (
+			NATURALLEFTOUTERJOIN ( _FromRel, _ToRel ),
+			[FromTable],
+			[FromColumn],
+			[ToTable],
+			[ToColumn],
+			[CrossFilter],
+			"Cardinality",
+				[FromCardinality] & " To " & [ToCardinality]
+		)
+
+EVALUATE _Result 
