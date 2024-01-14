@@ -1,3 +1,6 @@
+/****************************
+Based on the columns.dax query with additional information
+*****************************/
 DEFINE
     VAR _tables = 
         SELECTCOLUMNS(
