@@ -1,0 +1,52 @@
+/****************************
+Source: https://powerbi.microsoft.com/en-us/blog/dax-query-view-introduces-new-info-dax-functions/
+*****************************/
+DEFINE
+    VAR _tables = 
+        SELECTCOLUMNS(
+            FILTER(
+                INFO.TABLES(),
+                // Exclude hidden tables
+                [IsHidden] = FALSE()
+            ),
+            "TableID",[ID],
+            "TableName",[Name]
+        )
+    VAR _columns = 
+        FILTER(
+            INFO.COLUMNS(),
+            // Exclude RowNumber columns
+            [Type] <> 3
+            ) 
+    
+    VAR _result = 
+        SELECTCOLUMNS(
+            NATURALINNERJOIN( 
+                _columns,
+                _tables
+            ),
+            "Table",[TableName],
+            "Column",[ExplicitName],
+            "Description",[Description],
+            "Column in Data Source",[SourceColumn],
+            "Data Category", [DataCategory],
+            "Column Type", 
+                SWITCH(
+                    [Type],
+                    1,"Data column", 
+                    2, "Calculated column",
+                    [Type]
+                ),
+            "DAX formula", [Expression]
+		)
+EVALUATE
+    {COUNTROWS(
+        FILTER(
+            _result,
+            [Column Type] = "Calculated column")
+    )}
+    
+EVALUATE
+    FILTER(
+        _result,
+        [Column Type] = "Calculated column")
