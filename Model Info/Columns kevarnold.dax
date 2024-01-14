@@ -18,16 +18,16 @@ DEFINE
             // Exclude RowNumber columns
             [Type] <> 3
             ) 
-	VAR _Sortcolumns = 
-		SELECTCOLUMNS(
-			FILTER(
-				INFO.COLUMNS(),
-				// Exclude RowNumber columns
-				[Type] <> 3
-				),
-			"SortByColumnID",[ID]+0,
-			"SortByColumnName",[ExplicitName]
-		)
+    VAR _Sortcolumns = 
+	SELECTCOLUMNS(
+		FILTER(
+			INFO.COLUMNS(),
+			// Exclude RowNumber columns
+			[Type] <> 3
+			),
+		"SortByColumnID",[ID]+0,
+		"SortByColumnName",[ExplicitName]
+	)
 
     VAR _result = 
         SELECTCOLUMNS(
