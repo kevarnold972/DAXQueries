@@ -1,0 +1,77 @@
+DEFINE
+    VAR _tables = 
+        SELECTCOLUMNS(
+            FILTER(
+                INFO.TABLES(),
+                // Exclude hidden tables
+                [IsHidden] = FALSE()
+            ),
+            "TableID",[ID],
+            "TableName",[Name]
+        )
+    VAR _columns = 
+        FILTER(
+            INFO.COLUMNS(),
+            // Exclude RowNumber columns
+            [Type] <> 3
+            ) 
+	VAR _Sortcolumns = 
+		SELECTCOLUMNS(
+			FILTER(
+				INFO.COLUMNS(),
+				// Exclude RowNumber columns
+				[Type] <> 3
+				),
+			"SortByColumnID",[ID]+0,
+			"SortByColumnName",[ExplicitName]
+		)
+
+    VAR _result = 
+        SELECTCOLUMNS(
+			NATURALLEFTOUTERJOIN(
+				NATURALINNERJOIN( 
+					_columns,
+					_tables
+				),_Sortcolumns),
+            "Table",[TableName],
+            "Column",IF(ISBLANK([ExplicitName]),[InferredName] & " (Inferred)",[ExplicitName]),
+			// https://learn.microsoft.com/en-us/dotnet/api/microsoft.analysisservices.tabular.datatype?view=analysisservices-dotnet
+			"Data Type",
+				SWITCH (
+					[ExplicitDataType],
+					17,"Binary",
+					11,"Boolean",
+					9,"DateTime",
+					10,"Decimal",
+					8,"Double",
+					6,"Int64",
+					2,"String",
+					1,SWITCH(
+						[InferredDataType],
+						17,"Binary (Inferred)",
+						11,"Boolean (Inferred)",
+						9,"DateTime (Inferred)",
+						10,"Decimal (Inferred)",
+						8,"Double (Inferred)",
+						6,"Int64 (Inferred)",
+						2,"String (Inferred)",
+						[InferredDataType]
+					),
+					[ExplicitDataType]	
+				),
+            "Description",[Description],
+			"Sort By Column",[SortByColumnName],
+            "Column in Data Source",[SourceColumn],
+            "Data Category", [DataCategory],
+            "Column Type", 
+                SWITCH(
+                    [Type],
+                    1,"Data column", 
+                    2, "Calculated column",
+                    [Type]
+                ),
+            "DAX formula", [Expression],
+			"Format String",[FormatString]
+        )
+EVALUATE
+    _result
