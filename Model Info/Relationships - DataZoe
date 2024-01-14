@@ -1,0 +1,211 @@
+/****************************
+Source: https://www.datazoepowerbi.com/post/relationships-dax-query-using-info-relationships
+*****************************/
+DEFINE
+ VAR _Table = 
+ SELECTCOLUMNS(
+ INFO.TABLES(),
+ "TableID", [ID],
+ "TableName", [Name]
+ )
+ VAR _Col = 
+ SELECTCOLUMNS(
+ INFO.COLUMNS(),
+ "ColumnID", [ID],
+ "ColumnName",
+ IF(
+ ISBLANK([ExplicitName]),
+ [InferredName],
+ [ExplicitName]
+ )
+ )
+    
+    // https://learn.microsoft.com/dotnet/api/microsoft.analysisservices.tabular.relationship
+ VAR _RelFrom = 
+ SELECTCOLUMNS(
+ INFO.RELATIONSHIPS(),
+ [ID],
+ [FromCardinality],
+            // https://learn.microsoft.com/dotnet/api/microsoft.analysisservices.tabular.objectstate
+ "State",
+                SWITCH(
+                    [State],
+                    1, "Ready",
+                    3, "No Data",
+                    4, "Calculation Needed",
+                    5, "Semantic Error",
+                    6, "Evaluation Error",
+                    7, "Dependency Error",
+                    8, "Incomplete",
+                    9, "Syntax Error",
+                    10, "Force Calculation Needed",
+                    "Unknown"
+                    ),
+ [IsActive],
+ [RelyOnReferentialIntegrity],
+ [CrossFilteringBehavior],
+ [SecurityFilteringBehavior],
+ "ColumnID", [FromColumnID],
+ "TableID", [FromTableID]
+ )
+ VAR _RelTo = 
+ SELECTCOLUMNS(
+ INFO.RELATIONSHIPS(),
+ [ID],
+ [ToCardinality],
+ [State],
+ [CrossFilteringBehavior],
+ "ColumnID", [ToColumnID],
+ "TableID", [ToTableID]
+ )
+ VAR _FromRel = 
+ SELECTCOLUMNS(
+ NATURALLEFTOUTERJOIN(
+ NATURALLEFTOUTERJOIN(
+ _RelFrom,
+ _Table
+ ),
+ _Col
+ ),
+ [ID],
+ [State],
+ [IsActive],
+ [RelyOnReferentialIntegrity],
+ "From Table", [TableName],
+ "From Column", [ColumnName],
+ "Cross Filter Behavior",
+ SWITCH(
+ [CrossFilteringBehavior],
+ 1, "One",
+ 2, "Both",
+ "Something else"
+ ),
+ "Security Filter Behavior",
+ SWITCH(
+ [SecurityFilteringBehavior],
+ 1, "One",
+ 2, "Both",
+ 3, "None",
+ "Something else"
+ ),
+ "From Cardinality",
+ SWITCH(
+ [FromCardinality],
+ 1, "One",
+ 2, "Many",
+                    "Something else"
+ )
+ )
+ VAR _ToRel = 
+ SELECTCOLUMNS(
+ NATURALLEFTOUTERJOIN(
+ NATURALLEFTOUTERJOIN(
+ _RelTo,
+ _Table
+ ),
+ _Col
+ ),
+ [ID],
+ "To Table", [TableName],
+ "To Column", [ColumnName],
+ "Cross Filter Behavior (To)",
+ SWITCH(
+ [CrossFilteringBehavior],
+ 1, "One",
+ 2, "Both",
+ "Something else"
+ ),
+ "To Cardinality",
+ SWITCH(
+ [ToCardinality],
+ 1, "One",
+ 2, "Many",
+                "Something else"
+ )
+ )
+ VAR _result = 
+ SELECTCOLUMNS(
+ NATURALLEFTOUTERJOIN(
+ _FromRel,
+ _ToRel
+ ),
+ "Relationship (From/To)",
+ "'" & [From Table] & "'[" & [From Column] & "] " & SWITCH(
+ [From Cardinality],
+ "One", "1",
+ "Many", "*",
+ "?"
+ ) & SWITCH(
+ [Cross Filter Behavior],
+ "One", "[<-]",
+ "Both", "[<>]",
+ "[?]"
+ ) & SWITCH(
+ [To Cardinality],
+ "One", "1",
+ "Many", "*",
+ "?"
+ ) & " '" & [To Table] & "'[" & [To Column] & "]"
+ & IF([IsActive],"", " (Inactive)"),
+ "Relationship (To/From)",
+ "'" & [To Table] & "'[" & [To Column] & "] " & SWITCH(
+ [To Cardinality],
+ "One", "1",
+ "Many", "*",
+ "?"
+ ) & SWITCH(
+ [Cross Filter Behavior],
+ "One", "[->]",
+ "Both", "[<>]",
+ "[?]"
+ ) & SWITCH(
+ [From Cardinality],
+ "One", "1",
+ "Many", "*",
+ "?"
+ ) & " '" & [From Table] & "'[" & [From Column] & "]"
+ & IF([IsActive],"", " (Inactive)"),
+ [From Table],
+ [From Column],
+ [To Table],
+ [To Column],
+ "Is active",
+ IF([IsActive],"Active", "Inactive: USERELATIONSHIP required in a DAX formula to activate."),
+ "Cardinality (From/To)",
+ // Simpler verison
+            // [From Cardinality] & "/" & [To Cardinality],
+ UPPER( [From Cardinality]) & " row" & if([From Cardinality] = "One", "","s") & " in " & "'" & [From Table] & "'[" & [From Column] & "]" 
+ & " matches to " 
+ & UPPER([To Cardinality]) & " row" & if([To Cardinality] = "One", "","s") & " in " & [To Table] & "'[" & [To Column] & "]",
+ "Cardinality (To/From)",
+ UPPER( [To Cardinality]) & " row" & if([To Cardinality] = "One", "","s") & " in " & "'" & [To Table] & "'[" & [To Column] & "]" 
+ & " matches to " 
+ & UPPER([From Cardinality]) & " row" & if([From Cardinality] = "One", "","s") & " in " & [From Table] & "'[" & [From Column] & "]",
+            
+        // https://learn.microsoft.com/dotnet/api/microsoft.analysisservices.tabular.relationship.crossfilteringbehavior
+        // https://learn.microsoft.com/power-bi/transform-model/desktop-bidirectional-filtering
+ "Cross Filter Behavior",
+ SWITCH(
+ [Cross Filter Behavior],
+ "One", "One direction only: '" & [To Table] & "'[" & [To Column] & "] row filter/slicer selections (direct and indirect) will also filter matching rows in " & "'" & [From Table] & "'[" & [From Column] & "], but not vice versa.",
+ "Both", "Both directions: Filter/slicer selections from either table will also filter the other",
+ "Something else"
+ ),
+            
+        // https://learn.microsoft.com/power-bi/enterprise/service-admin-rls
+        // https://learn.microsoft.com/dotnet/api/microsoft.analysisservices.tabular.securityfilteringbehavior
+ "Security Filter Behavior",
+ SWITCH(
+ [Security Filter Behavior],
+ "One", "One direction: '" & [To Table] & "'[" & [To Column] & "] row level security (RLS) filters (direct and indirect) will also filter matching rows in " & "'" & [From Table] & "'[" & [From Column] & "], but not vice versa.",
+ "Both", "Both directions: Row level security (RLS) will apply from either table to the other",
+ "None", "None: Row level security (RLS) will not filter rows through this relationship",
+ "Something else"
+ ),
+            
+        // https://learn.microsoft.com/power-bi/connect-data/desktop-assume-referential-integrity    
+ "DirectQuery SQL join type",
+ IF([RelyOnReferentialIntegrity], "INNER join: non-matching rows excluded.", "OUTER join: non-matching rows included in a (Blank) group.")
+ )
+EVALUATE
+ _Result 
