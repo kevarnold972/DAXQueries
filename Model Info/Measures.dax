@@ -1,0 +1,31 @@
+/*****************************************************
+Measures Documentation
+From: https://powerbi.microsoft.com/en-us/blog/dax-query-view-introduces-new-info-dax-functions/
+
+******************************************************/
+
+EVALUATE
+    VAR _measures = 
+        SELECTCOLUMNS(
+            INFO.MEASURES(),
+            "Measure", [Name],
+            "Desc", [Description],
+            "DAX formula", [Expression],
+            "TableID", [TableID]
+        )
+    VAR _tables = 
+        SELECTCOLUMNS(
+            INFO.TABLES(),
+            "TableID", [ID],
+            "Table", [Name]
+        )
+    VAR _combined = 
+        NATURALLEFTOUTERJOIN(_measures, _tables)
+    RETURN
+        SELECTCOLUMNS(
+            _combined,
+            "Measure", [Measure],
+            "Desc", [Desc],
+            "DAX Formula", [DAX formula],
+            "Home Table", [Table]
+        )
