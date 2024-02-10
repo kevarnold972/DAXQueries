@@ -1,0 +1,76 @@
+/*
+This is based on the Columns.dax but with Column Statustics added in 
+*/
+DEFINE
+	VAR _tables = SELECTCOLUMNS(
+		FILTER(
+			INFO.TABLES(),
+			// Exclude hidden tables
+			[IsHidden] = FALSE()
+		),
+		"TableID",
+		[ID],
+		"TableName",
+		[Name]
+	)
+	VAR _columns = FILTER(
+		INFO.COLUMNS(),
+		// Exclude RowNumber columns
+		[Type] <> 3
+	)
+	VAR _ColumnStatus = SELECTCOLUMNS(
+		COLUMNSTATISTICS(),
+		"ColumnKey",
+		[Table Name] & [Column Name],
+		"Cardinality",
+		[Cardinality],
+		"Min",
+		[Min],
+		"Max",
+		[Max],
+		"Max Length",
+		[Max Length]
+	)
+	VAR _tablecolumns = SELECTCOLUMNS(
+		NATURALINNERJOIN(
+			_columns,
+			_tables
+		),
+		"ColumnKey",
+		[TableName] & [ExplicitName],
+		"Table",
+		[TableName],
+		"Column",
+		[ExplicitName],
+		"Description",
+		[Description],
+		"Column in Data Source",
+		[SourceColumn],
+		"Data Category",
+		[DataCategory],
+		"Column Type",
+		SWITCH(
+			[Type],
+			1, "Data column",
+			2, "Calculated column",
+			[Type]
+		),
+		"DAX formula",
+		[Expression]
+	)
+	VAR _results = SELECTCOLUMNS(NATURALINNERJOIN(
+			_tablecolumns,
+			_ColumnStatus
+		),
+		"Table",[Table],
+		"Column",[Column],
+		"Description",[Description],
+		"Data Category",[Data Category],
+		"Cardinality",[Cardinality],
+		"Min",[Min],
+		"Max",[Max],
+		"Max Length",[Max Length]
+		)
+
+EVALUATE
+	_results
